@@ -1,0 +1,82 @@
+#!/bin/bash
+
+# Put this in your roots crontab
+# min hour * * 0   /path/to/backup/bin/backup/bin/snapshot full true
+# min hour * * 1-6 /path/to/backup/bin/backup/bin/snapshot
+
+source /home/protonet/bin/backup/conf/global
+
+if [[ ! -d "$BACKUP_DIR" ]]; then
+    display_message "Failed - $BACKUP_DIR is not mounted"
+    exit 1
+fi
+
+[[ ! -d $BACKUP_DIR/backups ]] && mkdir $BACKUP_DIR/backups
+
+if [[ ! -e $BACKUP_DIR/backups/unencrypted ]]; then
+  display_message "$BACKUP_DIR/backups might not be mounted as encrypted. Mount now? Y/N"
+  read answer
+
+  if [[ $answer == 'Y' ]] || [[ $answer == 'y' ]]; then
+    mount -t ecryptfs -o ecryptfs_cipher=aes,ecryptfs_key_bytes=16,ecryptfs_enable_filename_crypto=no,\
+      ecryptfs_passthrough=no,key=passphrase:passphrase_passwd_file=/home/$USER_DIR/bin/backup/config/PASSPHRASE \
+      $BACKUP_DIR/backups $BACKUP_DIR/backups
+  fi
+
+  display_message "No encrytion file found. Create now? Y/N"
+  read answer
+ 
+  if [[ $answer == 'Y' ]] || [[ $answer == 'y' ]]; then
+    echo 'true' > $BACKUP_DIR/backups/unencrypted
+  fi
+
+fi 
+
+# PREPARE
+display_message "Preparing the backup.."
+
+DIRECTORY_CHECK=( $DUMPS_DIR $MYSQL_BACKUP_DIR $POSTGRESQL_BACKUP_DIR $SNAPSHOT_DIR_ENCRYPT $SNAPSHOT_DIR_NORMAL )
+
+# Create the directories to dump useful information if it doesn't exist
+for dir in ${DIRECTORY_CHECK[@]}
+do
+  if [ ! -d "$dir" ]; then
+    display_message "Creating $dir... Done!"
+    mkdir -p $dir
+  fi
+done
+
+if [ "$HOUSE_KEEPING" == 'true' ]; then
+  display_message "House keeping"
+
+  DIRECTORY_CHECK=( $DUMPS_DIR $MYSQL_BACKUP_DIR $POSTGRESQL_BACKUP_DIR )
+
+  # Clear database dumps and crontab file dumps older than 14 days
+  for dir in ${DIRECTORY_CHECK[@]}
+  do
+    display_message "Removing stale files in $dir... Done!"
+    find $dir -mtime +14 -exec rm '{}' \;
+  done
+fi
+
+display_message "Dumping cron data"
+# Dump database and crontab of the root user
+crontab -l > $DUMPS_DIR/crontab-$NOW.txt
+
+display_message "Dumping mysql data... Done!"
+`which mysqldump` > /dev/null
+[[ $? == 0 ]] &&  mysqldump --all-databases -uroot > $MYSQL_BACKUP_DIR/mydatabase-$NOW.sql
+
+display_message "Dumping postgresql data... Done!"
+`which pg_dumpall` > /dev/null
+[[ $? == 0 ]] && pg_dumpall -U postgres -w >  $POSTGRESQL_BACKUP_DIR/postgres-database-$NOW.sql
+
+display_message "End prepare!"
+# END PREPARE
+
+
+RSNAPSHOT_EXEC=`which rsnapshot`
+BACKUP_INTERVAL='full'
+[[ $BACKUP_TYPE != 'full'  ]] && BACKUP_INTERVAL='incremental'
+
+$RSNAPSHOT_EXEC $BACKUP_INTERVAL
