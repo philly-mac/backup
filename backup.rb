@@ -6,6 +6,7 @@ require 'fileutils'
 # s3cmd          - https://github.com/s3tools/s3cmd
 # tar            - http://www.gnu.org/software/tar/
 # rm             - http://pubs.opengroup.org/onlinepubs/9699919799/utilities/rm.html
+# Amazon s3      - http://aws.amazon.com/s3/
 
 # Optional
 
