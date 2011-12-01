@@ -32,7 +32,7 @@ require 'fileutils'
 @bucket               = "s3://linode.optomlocum.com/"
 @ecrypt_password_file = "/root/.PASSPHRASE"
 @ecrypt_options       = "-o ecryptfs_cipher=aes,ecryptfs_key_bytes=16,key=passphrase,ecryptfs_passthrough=n,passphrase_passwd_file=#{@ecrypt_password_file},ecryptfs_enable_filename_crypto=n"
-@log_file_dir         = "/root/"
+@log_file_dir         = "/root"
 
 @destinations         ||= {
   :encrypt  => '/root/backups',
@@ -67,7 +67,7 @@ require 'fileutils'
 
 def log_file
   key = full? ? :full : :incremental
-  @log_name ||= "#{@log_file_dir}/#{archive_name(key)}.log"
+  @log_name ||= "#{@log_file_dir}#{archive_name(key)}.log"
 end
 
 def create_log_file
@@ -187,12 +187,12 @@ elsif inc?
 
   if mounted?
     create_log_file
-    make_directory(:incrental)
+    make_directory(:incremental)
     clear_directory(:incremental)
 
-    sources.each do |source|
+    @sources.each do |source|
       make_directory("#{@destinations[:incremental]}#{source}")
-      run("#{@rsync_exec} -av --compare-dest=#{@destinations[:full]}#{source}/ #{source}/ #{@destinations[:incremental]}#{source}/")
+      run("#{@rsync_exec} -Rav #{@excludes.map{|e| "--exclude=#{e}"}.join(' ')} --compare-dest=#{@destinations[:full]}/ #{source}/ #{@destinations[:incremental]}/")
     end
 
     dump_db(:incremental)
