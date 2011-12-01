@@ -197,7 +197,7 @@ elsif inc?
 
     dump_db(:incremental)
     unmount!
-    archive(:incremental)
+    archive!(:incremental)
     transfer_to_s3(:incremental)
   else
     puts "Failed to mount"
