@@ -24,28 +24,28 @@ require 'fileutils'
 ##################################
 # Config
 
-s3cmd_exec           = "/root/bin/s3cmd/s3cmd"
-rsync_exec           = "/usr/bin/rsync"
-tar_exec             = "/bin/tar"
-rm_exec              = "/bin/rm"
+@s3cmd_exec           = "/root/bin/s3cmd/s3cmd"
+@rsync_exec           = "/usr/bin/rsync"
+@tar_exec             = "/bin/tar"
+@rm_exec              = "/bin/rm"
 
-bucket               = "s3://linode.optomlocum.com/"
-ecrypt_password_file = "/root/.PASSPHRASE"
-ecrypt_options       = "-o ecryptfs_cipher=aes,ecryptfs_key_bytes=16,key=passphrase,ecryptfs_passthrough=n,passphrase_passwd_file=#{ecrypt_password_file},ecryptfs_enable_filename_crypto=n"
-log_file_dir         = "/root/"
+@bucket               = "s3://linode.optomlocum.com/"
+@ecrypt_password_file = "/root/.PASSPHRASE"
+@ecrypt_options       = "-o ecryptfs_cipher=aes,ecryptfs_key_bytes=16,key=passphrase,ecryptfs_passthrough=n,passphrase_passwd_file=#{ecrypt_password_file},ecryptfs_enable_filename_crypto=n"
+@log_file_dir         = "/root/"
 
-destinations         ||= {
+@destinations         ||= {
   :encrypt  => '/root/backups',
   :archives => "/root/archives"
 }
 
-destinations.merge!({
+@destinations.merge!({
   :full        => "#{destinations[:encrypt]}/full",
   :incremental => "#{destinations[:encrypt]}/incremental"
 })
 
 # What to backup
-sources = [
+@sources = [
   "/var/www",
   "/etc",
   "/root",
@@ -54,9 +54,9 @@ sources = [
 ]
 
 # What to exclude from backups
-excludes = [
-  destinations[:encrypt],
-  destinations[:archives]
+@excludes = [
+  @destinations[:encrypt],
+  @destinations[:archives]
 ] + [
   # Add your custom excludes here
   '/root/Backup',
@@ -81,7 +81,7 @@ def run(cmd, exit_check = false)
 end
 
 def passphrase_file_exists?
-  File.exist?(ecrypt_password_file)
+  File.exist?(@ecrypt_password_file)
 end
 
 def mount!
@@ -89,9 +89,9 @@ def mount!
     puts "Mounting..."
     cmd = []
     cmd << "mount -t ecryptfs"
-    cmd << destinations[:encrypt]
-    cmd << destinations[:encrypt]
-    cmd << ecrypt_options
+    cmd << @destinations[:encrypt]
+    cmd << @destinations[:encrypt]
+    cmd << @ecrypt_options
     run(cmd.join(' '))
   else
     puts "Please create a passphrase file"
@@ -101,16 +101,16 @@ end
 
 def unmount!
   puts "Unmounting..."
-  run("umount #{destinations[:encrypt]}")
+  run("umount #{@destinations[:encrypt]}")
 end
 
 def mounted?
-  run("df -t ecryptfs | grep \"#{destinations[:encrypt].gsub('/','\\/')}\" 2>&1 > /dev/null", true)
+  run("df -t ecryptfs | grep \"#{@destinations[:encrypt].gsub('/','\\/')}\" 2>&1 > /dev/null", true)
 end
 
 def dump_db(key)
   puts "Dumping database..."
-  run("pg_dumpall -U postgres -w > #{destinations[key]}/postgres-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql")
+  run("pg_dumpall -U postgres -w > #{@destinations[key]}/postgres-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql")
 end
 
 def full?
@@ -130,7 +130,7 @@ def day_number
 end
 
 def make_directory(key)
-  path = key.is_a?(String) ? key : "#{destinations[key]}"
+  path = key.is_a?(String) ? key : "#{@destinations[key]}"
   unless File.exist?(path)
     puts "Creating #{path}"
     FileUtils.mkdir_p(path)
@@ -138,9 +138,9 @@ def make_directory(key)
 end
 
 def clear_directory(key)
-  path = "#{destinations[key]}/*"
+  path = "#{@destinations[key]}/*"
   puts "Clearing #{path}.."
-  run("#{rm_exec} -rf #{path}")
+  run("#{@rm_exec} -rf #{path}")
 end
 
 def archive_name(key)
@@ -151,13 +151,13 @@ def archive!(key)
   unless mounted?
     puts "Packing the archive.."
     make_directory(:archives)
-    run("#{tar_exec} -cjvf #{destinations[:archives]}/#{archive_name(key)}.tar.bz2 #{destinations[key]}")
+    run("#{@tar_exec} -cjvf #{@destinations[:archives]}/#{archive_name(key)}.tar.bz2 #{@destinations[key]}")
   end
 end
 
 def transfer_to_s3(key)
   puts "Transfering to s3..."
-  run "#{s3cmd_exec} put #{destinations[:archives]}/#{archive_name(key)}.tar.bz2 #{bucket}"
+  run "#{@s3cmd_exec} put #{@destinations[:archives]}/#{archive_name(key)}.tar.bz2 #{@bucket}"
 end
 
 
@@ -171,7 +171,7 @@ if full?
     create_log_file
     make_directory(:full)
     clear_directory(:full)
-    run("rsync -Rav #{excludes.map{|e| "--exclude=#{e}"}.join(' ')} #{sources.join(' ')} #{destinations[:full]}/")
+    run("#{@rsync_exec} -Rav #{@excludes.map{|e| "--exclude=#{e}"}.join(' ')} #{@sources.join(' ')} #{@destinations[:full]}/")
     dump_db(:full)
     unmount!
     archive!(:full)
@@ -190,8 +190,8 @@ elsif inc?
     clear_directory(:incremental)
 
     sources.each do |source|
-      make_directory("#{destinations[:incremental]}#{source}")
-      run("rsync -av --compare-dest=#{destinations[:full]}#{source}/ #{source}/ #{destinations[:incremental]}#{source}/")
+      make_directory("#{@destinations[:incremental]}#{source}")
+      run("#{@rsync_exec} -av --compare-dest=#{@destinations[:full]}#{source}/ #{source}/ #{@destinations[:incremental]}#{source}/")
     end
 
     dump_db(:incremental)
