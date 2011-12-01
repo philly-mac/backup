@@ -31,7 +31,7 @@ require 'fileutils'
 
 @bucket               = "s3://linode.optomlocum.com/"
 @ecrypt_password_file = "/root/.PASSPHRASE"
-@ecrypt_options       = "-o ecryptfs_cipher=aes,ecryptfs_key_bytes=16,key=passphrase,ecryptfs_passthrough=n,passphrase_passwd_file=#{ecrypt_password_file},ecryptfs_enable_filename_crypto=n"
+@ecrypt_options       = "-o ecryptfs_cipher=aes,ecryptfs_key_bytes=16,key=passphrase,ecryptfs_passthrough=n,passphrase_passwd_file=#{@ecrypt_password_file},ecryptfs_enable_filename_crypto=n"
 @log_file_dir         = "/root/"
 
 @destinations         ||= {
@@ -40,8 +40,8 @@ require 'fileutils'
 }
 
 @destinations.merge!({
-  :full        => "#{destinations[:encrypt]}/full",
-  :incremental => "#{destinations[:encrypt]}/incremental"
+  :full        => "#{@destinations[:encrypt]}/full",
+  :incremental => "#{@destinations[:encrypt]}/incremental"
 })
 
 # What to backup
@@ -66,11 +66,12 @@ require 'fileutils'
 ##################################
 
 def log_file
-  @log_name ||= "#{archive_name}.log"
+  key = full? ? :full : :incremental
+  @log_name ||= "#{@log_file_dir}/#{archive_name(key)}.log"
 end
 
 def create_log_file
-  make_directory(log_file_dir)
+  make_directory(@log_file_dir)
   run("touch #{log_file}")
 end
 
