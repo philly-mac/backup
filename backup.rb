@@ -175,6 +175,8 @@ if full?
     unmount!
     archive!(:full)
     transfer_to_s3(:full)
+  else
+    puts "Failed to mount"
   end
 elsif inc?
   puts "Incremental backup.."
@@ -195,9 +197,9 @@ elsif inc?
     unmount!
     archive(:incremental)
     transfer_to_s3(:incremental)
+  else
+    puts "Failed to mount"
   end
-else
-  puts "Failed to mount"
 end
 
 puts "Week Number #{week_number}"
