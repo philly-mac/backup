@@ -162,7 +162,7 @@ end
 
 def transfer_to_s3!(key)
   puts "Transfering to s3..."
-  run "#{@s3cmd_exec} put #{@destinations[:archives]}/#{archive_name(key)}.tar.bz2* #{@bucket}"
+  run "#{@s3cmd_exec} put #{@destinations[:archives]}/#{archive_name(key)}.tar.bz2-* #{@bucket}"
 end
 
 
