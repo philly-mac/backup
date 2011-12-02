@@ -162,7 +162,7 @@ end
 
 def transfer_to_s3!(key)
   puts "Transfering to s3..."
-  suffix = File.new("#{@destinations[:archives]}/#{archive_name(key)}.tar.bz2").size > 103424 ? '-' : ''
+  suffix = File.new("#{@destinations[:archives]}/#{archive_name(key)}.tar.bz2").size > 103424000 ? '-' : ''
   run!("#{@s3cmd_exec} put #{@destinations[:archives]}/#{archive_name(key)}.tar.bz2#{suffix}* #{@bucket}")
 end
 
