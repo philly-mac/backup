@@ -6,6 +6,7 @@ require 'fileutils'
 # s3cmd          - https://github.com/s3tools/s3cmd
 # tar            - http://www.gnu.org/software/tar/
 # rm             - http://pubs.opengroup.org/onlinepubs/9699919799/utilities/rm.html
+# split
 # Amazon s3      - http://aws.amazon.com/s3/
 
 # Optional
@@ -70,12 +71,13 @@ def log_file
   @log_name ||= "#{@log_file_dir}#{archive_name(key)}.log"
 end
 
-def create_log_file
+def create_log_file!
   make_directory(@log_file_dir)
   run("touch #{log_file}")
+  run("> #{log_file}")
 end
 
-def run(cmd, exit_check = false)
+def run!(cmd, exit_check = false)
   cmd << " >> #{log_file}"
   puts "Running #{cmd}..."
   exit_check ? system(cmd) : `#{cmd}`
@@ -130,7 +132,7 @@ def day_number
   Time.now.strftime('%w')
 end
 
-def make_directory(key)
+def make_directory!(key)
   path = key.is_a?(String) ? key : "#{@destinations[key]}"
   unless File.exist?(path)
     puts "Creating #{path}"
@@ -138,7 +140,7 @@ def make_directory(key)
   end
 end
 
-def clear_directory(key)
+def clear_directory!(key)
   path = "#{@destinations[key]}/*"
   puts "Clearing #{path}.."
   run("#{@rm_exec} -rf #{path}")
@@ -152,13 +154,15 @@ def archive!(key)
   unless mounted?
     puts "Packing the archive.."
     make_directory(:archives)
-    run("#{@tar_exec} -cjvf #{@destinations[:archives]}/#{archive_name(key)}.tar.bz2 #{@destinations[key]}")
+    cmd =  "#{@tar_exec} -cjvf #{@destinations[:archives]}/#{archive_name(key)}.tar.bz2 #{@destinations[key]}"
+    cmd << " | split -b 100m -d - archive_name(key).tar.bz2-"
+    run(cmd)
   end
 end
 
-def transfer_to_s3(key)
+def transfer_to_s3!(key)
   puts "Transfering to s3..."
-  run "#{@s3cmd_exec} put #{@destinations[:archives]}/#{archive_name(key)}.tar.bz2 #{@bucket}"
+  run "#{@s3cmd_exec} put #{@destinations[:archives]}/#{archive_name(key)}.tar.bz2* #{@bucket}"
 end
 
 
@@ -170,13 +174,13 @@ if full?
 
   if mounted?
     create_log_file
-    make_directory(:full)
-    clear_directory(:full)
-    run("#{@rsync_exec} -Rav #{@excludes.map{|e| "--exclude=#{e}"}.join(' ')} #{@sources.join(' ')} #{@destinations[:full]}/")
-    dump_db(:full)
+    make_directory!(:full)
+    clear_directory!(:full)
+    run!("#{@rsync_exec} -Rav #{@excludes.map{|e| "--exclude=#{e}"}.join(' ')} #{@sources.join(' ')} #{@destinations[:full]}/")
+    dump_db!(:full)
     unmount!
     archive!(:full)
-    transfer_to_s3(:full)
+    transfer_to_s3!(:full)
   else
     puts "Failed to mount"
   end
@@ -186,19 +190,19 @@ elsif inc?
   mount! unless mounted?
 
   if mounted?
-    create_log_file
-    make_directory(:incremental)
-    clear_directory(:incremental)
+    create_log_file!
+    make_directory!(:incremental)
+    clear_directory!(:incremental)
 
     @sources.each do |source|
-      make_directory("#{@destinations[:incremental]}#{source}")
-      run("#{@rsync_exec} -Rav #{@excludes.map{|e| "--exclude=#{e}"}.join(' ')} --compare-dest=#{@destinations[:full]}/ #{source}/ #{@destinations[:incremental]}/")
+      make_directory!("#{@destinations[:incremental]}#{source}")
+      run!("#{@rsync_exec} -Rav #{@excludes.map{|e| "--exclude=#{e}"}.join(' ')} --compare-dest=#{@destinations[:full]}/ #{source}/ #{@destinations[:incremental]}/")
     end
 
-    dump_db(:incremental)
+    dump_db!(:incremental)
     unmount!
     archive!(:incremental)
-    transfer_to_s3(:incremental)
+    transfer_to_s3!(:incremental)
   else
     puts "Failed to mount"
   end
