@@ -72,9 +72,9 @@ def log_file
 end
 
 def create_log_file!
-  make_directory(@log_file_dir)
-  run("touch #{log_file}")
-  run("> #{log_file}")
+  make_directory!(@log_file_dir)
+  run!("touch #{log_file}")
+  run!("> #{log_file}")
 end
 
 def run!(cmd, exit_check = false)
@@ -95,7 +95,7 @@ def mount!
     cmd << @destinations[:encrypt]
     cmd << @destinations[:encrypt]
     cmd << @ecrypt_options
-    run(cmd.join(' '))
+    run!(cmd.join(' '))
   else
     puts "Please create a passphrase file"
     exit(1)
@@ -104,16 +104,16 @@ end
 
 def unmount!
   puts "Unmounting..."
-  run("umount #{@destinations[:encrypt]}")
+  run!("umount #{@destinations[:encrypt]}")
 end
 
 def mounted?
-  run("df -t ecryptfs | grep \"#{@destinations[:encrypt].gsub('/','\\/')}\" 2>&1 > /dev/null", true)
+  run!("df -t ecryptfs | grep \"#{@destinations[:encrypt].gsub('/','\\/')}\" 2>&1 > /dev/null", true)
 end
 
-def dump_db(key)
+def dump_db!(key)
   puts "Dumping database..."
-  run("pg_dumpall -U postgres -w > #{@destinations[key]}/postgres-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql")
+  run!("pg_dumpall -U postgres -w > #{@destinations[key]}/postgres-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql")
 end
 
 def full?
@@ -143,7 +143,7 @@ end
 def clear_directory!(key)
   path = "#{@destinations[key]}/*"
   puts "Clearing #{path}.."
-  run("#{@rm_exec} -rf #{path}")
+  run!("#{@rm_exec} -rf #{path}")
 end
 
 def archive_name(key)
@@ -153,16 +153,17 @@ end
 def archive!(key)
   unless mounted?
     puts "Packing the archive.."
-    make_directory(:archives)
+    make_directory!(:archives)
     cmd =  "#{@tar_exec} -cjvf #{@destinations[:archives]}/#{archive_name(key)}.tar.bz2 #{@destinations[key]}"
-    cmd << " | split -b 100m -d - archive_name(key).tar.bz2-"
-    run(cmd)
+    cmd << " | split -b 100m -d - #{archive_name(key)}.tar.bz2-"
+    run!(cmd)
   end
 end
 
 def transfer_to_s3!(key)
   puts "Transfering to s3..."
-  run "#{@s3cmd_exec} put #{@destinations[:archives]}/#{archive_name(key)}.tar.bz2-* #{@bucket}"
+  suffix = File.new("#{@destinations[:archives]}/#{archive_name(key)}.tar.bz2").size > 103424 ? '-' : ''
+  run!("#{@s3cmd_exec} put #{@destinations[:archives]}/#{archive_name(key)}.tar.bz2#{suffix}* #{@bucket}")
 end
 
 
