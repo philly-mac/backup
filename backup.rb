@@ -153,17 +153,17 @@ end
 def archive!(key)
   unless mounted?
     puts "Packing the archive.."
-    make_directory!(:archives)
-    cmd =  "#{@tar_exec} -cjvf #{@destinations[:archives]}/#{archive_name(key)}.tar.bz2 #{@destinations[key]}"
-    cmd << " | split -b 100m -d - #{archive_name(key)}.tar.bz2-"
-    run!(cmd)
+    make_directory(:archives)
+    cmd =  "#{@tar_exec} -cjv #{@destinations[:archives]}/#{archive_name(key)}.tar.bz2 #{@destinations[key]}"
+    cmd << " | split -b 100m -d -- archive_name(key).tar.bz2-"
+    run(cmd)
   end
 end
 
 def transfer_to_s3!(key)
   puts "Transfering to s3..."
-  suffix = File.new("#{@destinations[:archives]}/#{archive_name(key)}.tar.bz2").size > 103424000 ? '-' : ''
-  run!("#{@s3cmd_exec} put #{@destinations[:archives]}/#{archive_name(key)}.tar.bz2#{suffix}* #{@bucket}")
+  run!("#{@s3cmd_exec} put #{@destinations[:archives]}/#{archive_name(key)}.tar.bz2* #{@bucket}")
+  run!("#{@s3cmd_exec} -ls #{@bucket}")
 end
 
 
@@ -174,7 +174,7 @@ if full?
   mount! unless mounted?
 
   if mounted?
-    create_log_file
+    create_log_file!
     make_directory!(:full)
     clear_directory!(:full)
     run!("#{@rsync_exec} -Rav #{@excludes.map{|e| "--exclude=#{e}"}.join(' ')} #{@sources.join(' ')} #{@destinations[:full]}/")
