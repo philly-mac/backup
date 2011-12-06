@@ -77,8 +77,8 @@ def create_log_file!
   run!("> #{log_file}")
 end
 
-def run!(cmd, exit_check = false)
-  cmd << " >> #{log_file}"
+def run!(cmd, log = true, exit_check = false)
+  cmd << " >> #{log_file}" if log
   puts "Running #{cmd}..."
   exit_check ? system(cmd) : `#{cmd}`
 end
@@ -108,12 +108,12 @@ def unmount!
 end
 
 def mounted?
-  run!("df -t ecryptfs | grep \"#{@destinations[:encrypt].gsub('/','\\/')}\" 2>&1 > /dev/null", true)
+  run!("df -t ecryptfs | grep \"#{@destinations[:encrypt].gsub('/','\\/')}\" 2>&1 > /dev/null", true, true)
 end
 
 def dump_db!(key)
   puts "Dumping database..."
-  run!("pg_dumpall -U postgres -w > #{@destinations[key]}/postgres-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql")
+  run!("pg_dumpall -U postgres -w > #{@destinations[key]}/postgres-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql", false)
 end
 
 def full?
@@ -147,23 +147,21 @@ def clear_directory!(key)
 end
 
 def archive_name(key)
-  key == :full ? "/backup-full-#{week_number}" : "/backup-inc-#{week_number}-#{day_number}"
+  key == :full ? "backup-full-#{week_number}" : "backup-inc-#{week_number}-#{day_number}"
 end
 
 def archive!(key)
   unless mounted?
     puts "Packing the archive.."
-    make_directory(:archives)
-    cmd =  "#{@tar_exec} -cjv #{@destinations[:archives]}/#{archive_name(key)}.tar.bz2 #{@destinations[key]}"
-    cmd << " | split -b 100m -d -- archive_name(key).tar.bz2-"
-    run(cmd)
+    make_directory!(:archives)
+    run!("#{@tar_exec} -cj #{@destinations[key]} | split -b 100m -d - '#{@destinations[:archives]}/#{archive_name(key)}.tar.bz2-'", false)
   end
 end
 
 def transfer_to_s3!(key)
   puts "Transfering to s3..."
   run!("#{@s3cmd_exec} put #{@destinations[:archives]}/#{archive_name(key)}.tar.bz2* #{@bucket}")
-  run!("#{@s3cmd_exec} -ls #{@bucket}")
+  run!("#{@s3cmd_exec} ls #{@bucket}", false)
 end
 
 
