@@ -1,3 +1,5 @@
+#!/usr/bin/env ruby
+
 require 'fileutils'
 
 # Requirements
@@ -14,6 +16,12 @@ require 'fileutils'
 # Postgres       - http://www.postgresql.org/
 
 # Follow the individual instructions for each of the tools on how to set them up properly
+
+# You will probably want to back up daily, so these are 2 lines that you can put
+# into your crontab to do just that. Remove the comment hashes ofcourse ;)
+
+# 0 1 * * 1           /opt/backup/backup full
+# 0 2 * * 2,3,4,5,6,7 /opt/backup/backup inc
 
 ##################################
 # Config
