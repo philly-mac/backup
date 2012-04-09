@@ -1,7 +1,7 @@
 require 'fileutils'
 
 # Requirements
-# Ecryptfs utils - https://launchpad.net/ecryptfs
+# openssl        -
 # Rsync          - http://rsync.samba.org/
 # s3cmd          - https://github.com/s3tools/s3cmd
 # tar            - http://www.gnu.org/software/tar/
@@ -15,29 +15,24 @@ require 'fileutils'
 
 # Follow the individual instructions for each of the tools on how to set them up properly
 
-# Hint! for ecryptfs you will have to create a file which has the format
-# passwd=THE_PASSWORD_YOU_WANT_TO_USE_TO_ENCRYPT
-
-# I also suggest that you run the ecrypt mount at least once manually because it will ask you to
-# store the options the first time you run. Just answer yes, and then when you run this tool it wont
-# seem to freeze.
-
 ##################################
 # Config
 
-@s3cmd_exec           = "/root/bin/s3cmd/s3cmd"
+@base                 = '/opt/backup'
+@s3cmd_exec           = "#{@base}/bin/s3cmd/s3cmd"
 @rsync_exec           = "/usr/bin/rsync"
 @tar_exec             = "/bin/tar"
 @rm_exec              = "/bin/rm"
 
 @bucket               = "s3://linode.optomlocum.com/"
-@ecrypt_password_file = "/root/.PASSPHRASE"
-@ecrypt_options       = "-o ecryptfs_cipher=aes,ecryptfs_key_bytes=16,key=passphrase,ecryptfs_passthrough=n,passphrase_passwd_file=#{@ecrypt_password_file},ecryptfs_enable_filename_crypto=n"
-@log_file_dir         = "/root"
+
+# File with password used to encrypt
+@ecrypt_password_file = "#{@base}/config/PASSPHRASE"
+@log_file_dir         = "#{@base}/log"
 
 @destinations         ||= {
-  :encrypt  => '/root/backups',
-  :archives => "/root/archives"
+  :encrypt  => '#{@base}/backups',
+  :archives => "#{@base}/archives"
 }
 
 @destinations.merge!({
@@ -60,7 +55,6 @@ require 'fileutils'
   @destinations[:archives]
 ] + [
   # Add your custom excludes here
-  '/root/Backup',
 ]
 
 # End config
@@ -87,49 +81,34 @@ def passphrase_file_exists?
   File.exist?(@ecrypt_password_file)
 end
 
-def mount!
-  if passphrase_file_exists?
-    puts "Mounting..."
-    cmd = []
-    cmd << "mount -t ecryptfs"
-    cmd << @destinations[:encrypt]
-    cmd << @destinations[:encrypt]
-    cmd << @ecrypt_options
-    run!(cmd.join(' '))
-  else
-    puts "Please create a passphrase file"
-    exit(1)
-  end
-end
-
-def unmount!
-  puts "Unmounting..."
-  run!("umount #{@destinations[:encrypt]}")
-end
-
-def mounted?
-  run!("df -t ecryptfs | grep \"#{@destinations[:encrypt].gsub('/','\\/')}\" 2>&1 > /dev/null", true)
-end
-
 def dump_db!(key)
+  # TODO: check postgres exists
   puts "Dumping database..."
   run!("pg_dumpall -U postgres -w > #{@destinations[key]}/postgres-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql")
 end
 
 def full?
-  ARGV.first == 'full'
+  @full ||= ARGV.first == 'full'
 end
 
 def inc?
-  ARGV.first == 'inc'
+  @inc ||= ARGV.first == 'inc'
+end
+
+def year
+  @year ||= Time.now.strftime('%Y')
 end
 
 def week_number
-  Time.now.strftime('%V')
+  @week_number ||= Time.now.strftime('%V')
 end
 
 def day_number
-  Time.now.strftime('%w')
+  @day_number ||= Time.now.strftime('%w')
+end
+
+def archive_name
+  full? ? "/backup-full-#{year}-#{week_number}" : "/backup-inc-#{year}-#{week_number}-#{day_number}"
 end
 
 def make_directory!(key)
@@ -146,68 +125,44 @@ def clear_directory!(key)
   run!("#{@rm_exec} -rf #{path}")
 end
 
-def archive_name(key)
-  key == :full ? "/backup-full-#{week_number}" : "/backup-inc-#{week_number}-#{day_number}"
-end
-
 def archive!(key)
-  unless mounted?
-    puts "Packing the archive.."
-    make_directory(:archives)
-    cmd =  "#{@tar_exec} -cjv #{@destinations[:archives]}/#{archive_name(key)}.tar.bz2 #{@destinations[key]}"
-    cmd << " | split -b 100m -d -- archive_name(key).tar.bz2-"
-    run(cmd)
-  end
+  puts "Packing the archive.."
+  make_directory!(:archives)
+  run!("#{@tar_exec} -cj #{@destinations[key]} | openssl des3 -salt -k `cat #{@ecrypt_password_file}` | split -b 100m -d - '#{archive_name}.tar.bz2-'", false)
 end
 
 def transfer_to_s3!(key)
   puts "Transfering to s3..."
-  run!("#{@s3cmd_exec} put #{@destinations[:archives]}/#{archive_name(key)}.tar.bz2* #{@bucket}")
+  run!("#{@s3cmd_exec} put #{@destinations[:archives]}/#{archive_name}.tar.bz2* #{@bucket}")
   run!("#{@s3cmd_exec} -ls #{@bucket}")
 end
-
 
 # Backup
 if full?
   puts "Full backup.."
-
-  mount! unless mounted?
-
-  if mounted?
-    create_log_file!
-    make_directory!(:full)
-    clear_directory!(:full)
-    run!("#{@rsync_exec} -Rav #{@excludes.map{|e| "--exclude=#{e}"}.join(' ')} #{@sources.join(' ')} #{@destinations[:full]}/")
-    dump_db!(:full)
-    unmount!
-    archive!(:full)
-    transfer_to_s3!(:full)
-  else
-    puts "Failed to mount"
-  end
+  create_log_file!
+  make_directory!(:full)
+  clear_directory!(:full)
+  run!("#{@rsync_exec} -Rav #{@excludes.map{|e| "--exclude=#{e}"}.join(' ')} #{@sources.join(' ')} #{@destinations[:full]}/")
+  dump_db!(:full)
+  archive!(:full)
+  transfer_to_s3!(:full)
 elsif inc?
   puts "Incremental backup.."
+  create_log_file!
+  make_directory!(:incremental)
+  clear_directory!(:incremental)
 
-  mount! unless mounted?
-
-  if mounted?
-    create_log_file!
-    make_directory!(:incremental)
-    clear_directory!(:incremental)
-
-    @sources.each do |source|
-      make_directory!("#{@destinations[:incremental]}#{source}")
-      run!("#{@rsync_exec} -Rav #{@excludes.map{|e| "--exclude=#{e}"}.join(' ')} --compare-dest=#{@destinations[:full]}/ #{source}/ #{@destinations[:incremental]}/")
-    end
-
-    dump_db!(:incremental)
-    unmount!
-    archive!(:incremental)
-    transfer_to_s3!(:incremental)
-  else
-    puts "Failed to mount"
+  @sources.each do |source|
+    make_directory!("#{@destinations[:incremental]}#{source}")
+    run!("#{@rsync_exec} -Rav #{@excludes.map{|e| "--exclude=#{e}"}.join(' ')} --compare-dest=#{@destinations[:full]}/ #{source}/ #{@destinations[:incremental]}/")
   end
+
+  dump_db!(:incremental)
+  archive!(:incremental)
+  transfer_to_s3!(:incremental)
 end
 
+puts "Year #{year}"
 puts "Week Number #{week_number}"
 puts "Day Number #{day_number}"
