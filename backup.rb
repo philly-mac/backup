@@ -71,8 +71,8 @@ def create_log_file!
   run!("> #{log_file}")
 end
 
-def run!(cmd, exit_check = false)
-  cmd << " >> #{log_file}"
+def run!(cmd, log = true, exit_check = false)
+  cmd << " >> #{log_file}" if log
   puts "Running #{cmd}..."
   exit_check ? system(cmd) : `#{cmd}`
 end
@@ -84,7 +84,7 @@ end
 def dump_db!(key)
   # TODO: check postgres exists
   puts "Dumping database..."
-  run!("pg_dumpall -U postgres -w > #{@destinations[key]}/postgres-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql")
+  run!("pg_dumpall -U postgres -w > #{@destinations[key]}/postgres-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql", false)
 end
 
 def full?
