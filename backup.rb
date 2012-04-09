@@ -19,12 +19,12 @@ require 'fileutils'
 # Config
 
 @base                 = '/opt/backup'
-@s3cmd_exec           = "#{@base}/bin/s3cmd/s3cmd"
+@s3cmd_exec           = "/opt/s3cmd/s3cmd"
 @rsync_exec           = "/usr/bin/rsync"
 @tar_exec             = "/bin/tar"
 @rm_exec              = "/bin/rm"
 
-@bucket               = "s3://linode.optomlocum.com/"
+@bucket               = "s3://my.bucket.com/"
 
 # File with password used to encrypt
 @ecrypt_password_file = "#{@base}/config/PASSPHRASE"
