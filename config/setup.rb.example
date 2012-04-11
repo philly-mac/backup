@@ -22,7 +22,7 @@
 @backup_chunk_size = 100
 
 # Name of your s3 bucket
-@bucket               = "s3://my.bucket.com/"
+@bucket = "s3://my.bucket.com/"
 
 # Should we dump and back up your postgresql database
 @backup_postgresql_dump          = true

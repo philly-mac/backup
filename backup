@@ -32,6 +32,9 @@ require 'fileutils'
 ##################################
 # Config
 
+# Store config separate so that they don't get overwritten
+require "#{File.expand_path(File.dirname(__FILE__))}/config/setup"
+
 @destinations         ||= {
   :encrypt  => "#{@base}/backups",
   :archives => "#{@base}/archives"
@@ -47,10 +50,7 @@ require 'fileutils'
   @destinations[:archives]
 ]
 
-# Store config separate so that they don't get overriden
-require "#{File.expand_path(File.dirname(__FILE__))}/config/setup"
-
-@excludes = @excludes + custom_excludes
+@excludes = @excludes + @custom_excludes
 
 # End config
 ##################################
