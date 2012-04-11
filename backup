@@ -23,6 +23,13 @@ require 'fileutils'
 # 0 1 * * 1           /opt/backup/backup full
 # 0 2 * * 2,3,4,5,6,7 /opt/backup/backup inc
 
+# TODO:
+# Remove backups older than ... configurable
+# Make the split size of the backup be configurable
+# Restore from method
+# Delete local caches
+# Rotate local logs
+
 ##################################
 # Config
 
@@ -70,7 +77,7 @@ require 'fileutils'
 
 def log_file
   key = full? ? :full : :incremental
-  @log_name ||= "#{@log_file_dir}#{archive_name(key)}.log"
+  @log_name ||= "#{@log_file_dir}#{archive_name}.log"
 end
 
 def create_log_file!
