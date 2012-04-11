@@ -46,7 +46,7 @@ require 'fileutils'
 @log_file_dir         = "#{@base}/log"
 
 @destinations         ||= {
-  :encrypt  => '#{@base}/backups',
+  :encrypt  => "#{@base}/backups",
   :archives => "#{@base}/archives"
 }
 
@@ -149,7 +149,7 @@ end
 def transfer_to_s3!(key)
   puts "Transfering to s3..."
   run!("#{@s3cmd_exec} put #{@destinations[:archives]}/#{archive_name}.tar.bz2* #{@bucket}")
-  run!("#{@s3cmd_exec} -ls #{@bucket}")
+  run!("#{@s3cmd_exec} ls #{@bucket}")
 end
 
 # Backup
