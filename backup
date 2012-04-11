@@ -98,12 +98,12 @@ def dump_mysql!(key)
 end
 
 def dump_mongodb!(key)
-  # TODO: check mysql exists
+  # TODO: check mongodb exists
   puts "Dumping Mongodb databases..."
   credentials = ''
-  # credentials = "-u #{@backup_mysql_dump_user}"     if @backup_mysql_dump_user
-  # credentials = "-p #{@backup_mysql_dump_password}" if @backup_mysql_dump_password
-  # run!("mysqldump #{credentials} -w > #{@destinations[key]}/mysql-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql", false)
+  credentials = "-u #{@backup_mongodb_dump_user}"     if @backup_mongodb_dump_user
+  credentials = "-p #{@backup_mongodb_dump_password}" if @backup_mongodb_dump_password
+  run!("mysqldump #{credentials} --out - > #{@destinations[key]}/mongodb-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql", false)
 end
 
 def dump_db!(key)
