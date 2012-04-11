@@ -11,6 +11,9 @@
 @rsync_exec           = "/usr/bin/rsync"
 @tar_exec             = "/bin/tar"
 @rm_exec              = "/bin/rm"
+@pg_dumpall_exec      = "/bin/pg_dumpall"
+@mysqldump_exec       = "/usr/bin/mysqldump"
+@mongodump_exec       = "/usr/bin/mongodump"
 
 # File with password used to encrypt
 @ecrypt_password_file = "#{@base}/config/PASSPHRASE"

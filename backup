@@ -84,7 +84,7 @@ def dump_postgresql!(key)
 
   cmd = ""
   cmd << "PGPASSWORD=#{@backup_mysql_dump_password}; " if @backup_postgresql_dump_password
-  cmd << "pg_dumpall #{credentials} -c -w > #{@destinations[key]}/postgresql-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql"
+  cmd << "#{@pg_dumpall_exec} #{credentials} -c -w > #{@destinations[key]}/postgresql-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql"
   run!(cmd, false)
 end
 
@@ -94,7 +94,7 @@ def dump_mysql!(key)
   credentials = ''
   credentials = "-u #{@backup_mysql_dump_user}"     if @backup_mysql_dump_user
   credentials = "-p #{@backup_mysql_dump_password}" if @backup_mysql_dump_password
-  run!("mysqldump #{credentials} --all-databases > #{@destinations[key]}/mysql-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql", false)
+  run!("#{@mysqldump_exec} #{credentials} --all-databases > #{@destinations[key]}/mysql-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql", false)
 end
 
 def dump_mongodb!(key)
@@ -103,7 +103,7 @@ def dump_mongodb!(key)
   credentials = ''
   credentials = "-u #{@backup_mongodb_dump_user}"     if @backup_mongodb_dump_user
   credentials = "-p #{@backup_mongodb_dump_password}" if @backup_mongodb_dump_password
-  run!("mysqldump #{credentials} --out - > #{@destinations[key]}/mongodb-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql", false)
+  run!("#{@mongodump_exec} #{credentials} --out - > #{@destinations[key]}/mongodb-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql", false)
 end
 
 def dump_db!(key)
