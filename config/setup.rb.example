@@ -39,7 +39,7 @@
 
 # Should we dump and back up your mongo database
 @backup_mongodb_dump          = true
-@backup_mongodb_dump_user     = 'root'
+@backup_mongodb_dump_user     = nil
 @backup_mongodb_dump_password = nil
 
 # What to backup

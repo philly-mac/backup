@@ -77,7 +77,6 @@ def passphrase_file_exists?
 end
 
 def dump_postgresql!(key)
-  # TODO: check postgres exists
   puts "Dumping Postgresql databases..."
   credentials = ''
   credentials = "-U #{@backup_postgresql_dump_user}"    if @backup_postgresql_dump_user
@@ -89,7 +88,6 @@ def dump_postgresql!(key)
 end
 
 def dump_mysql!(key)
-  # TODO: check mysql exists
   puts "Dumping Mysql databases..."
   credentials = ''
   credentials = "-u #{@backup_mysql_dump_user}"     if @backup_mysql_dump_user
@@ -98,7 +96,6 @@ def dump_mysql!(key)
 end
 
 def dump_mongodb!(key)
-  # TODO: check mongodb exists
   puts "Dumping Mongodb databases..."
   credentials = ''
   credentials = "-u #{@backup_mongodb_dump_user}"     if @backup_mongodb_dump_user
