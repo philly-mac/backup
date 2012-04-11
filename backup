@@ -25,25 +25,12 @@ require 'fileutils'
 
 # TODO:
 # Remove backups older than ... configurable
-# Make the split size of the backup be configurable
 # Restore from method
 # Delete local caches
 # Rotate local logs
 
 ##################################
 # Config
-
-@base                 = '/opt/backup'
-@s3cmd_exec           = "/opt/s3cmd/s3cmd"
-@rsync_exec           = "/usr/bin/rsync"
-@tar_exec             = "/bin/tar"
-@rm_exec              = "/bin/rm"
-
-@bucket               = "s3://my.bucket.com/"
-
-# File with password used to encrypt
-@ecrypt_password_file = "#{@base}/config/PASSPHRASE"
-@log_file_dir         = "#{@base}/log"
 
 @destinations         ||= {
   :encrypt  => "#{@base}/backups",
@@ -55,22 +42,15 @@ require 'fileutils'
   :incremental => "#{@destinations[:encrypt]}/incremental"
 })
 
-# What to backup
-@sources = [
-  "/var/www",
-  "/etc",
-  "/root",
-  "/usr/local",
-  "/home"
-]
-
-# What to exclude from backups
 @excludes = [
   @destinations[:encrypt],
   @destinations[:archives]
-] + [
-  # Add your custom excludes here
 ]
+
+# Store config separate so that they don't get overriden
+require "#{File.expand_path(File.dirname(__FILE__))}/config/setup"
+
+@excludes = @excludes + custom_excludes
 
 # End config
 ##################################
@@ -96,10 +76,40 @@ def passphrase_file_exists?
   File.exist?(@ecrypt_password_file)
 end
 
-def dump_db!(key)
+def dump_postgresql!(key)
   # TODO: check postgres exists
-  puts "Dumping database..."
-  run!("pg_dumpall -U postgres -w > #{@destinations[key]}/postgres-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql", false)
+  puts "Dumping Postgresql databases..."
+  credentials = ''
+  credentials = "-U #{@backup_postgresql_dump_user}"    if @backup_postgresql_dump_user
+
+  cmd = ""
+  cmd << "PGPASSWORD=#{@backup_mysql_dump_password}; " if @backup_postgresql_dump_password
+  cmd << "pg_dumpall #{credentials} -c -w > #{@destinations[key]}/postgresql-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql"
+  run!(cmd, false)
+end
+
+def dump_mysql!(key)
+  # TODO: check mysql exists
+  puts "Dumping Mysql databases..."
+  credentials = ''
+  credentials = "-u #{@backup_mysql_dump_user}"     if @backup_mysql_dump_user
+  credentials = "-p #{@backup_mysql_dump_password}" if @backup_mysql_dump_password
+  run!("mysqldump #{credentials} --all-databases > #{@destinations[key]}/mysql-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql", false)
+end
+
+def dump_mongodb!(key)
+  # TODO: check mysql exists
+  puts "Dumping Mongodb databases..."
+  credentials = ''
+  # credentials = "-u #{@backup_mysql_dump_user}"     if @backup_mysql_dump_user
+  # credentials = "-p #{@backup_mysql_dump_password}" if @backup_mysql_dump_password
+  # run!("mysqldump #{credentials} -w > #{@destinations[key]}/mysql-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql", false)
+end
+
+def dump_db!(key)
+  dump_postgresql!(key) if @backup_postgresql_dump
+  dump_mysql!(key)      if @backup_mysql_dump
+  dump_mongodb!(key)    if @backup_mongodb_dump
 end
 
 def full?
@@ -143,7 +153,7 @@ end
 def archive!(key)
   puts "Packing the archive.."
   make_directory!(:archives)
-  run!("#{@tar_exec} -cj #{@destinations[key]} | openssl des3 -salt -k `cat #{@ecrypt_password_file}` | split -b 100m -d - '#{archive_name}.tar.bz2-'", false)
+  run!("#{@tar_exec} -cj #{@destinations[key]} | openssl des3 -salt -k `cat #{@ecrypt_password_file}` | split -b #{@backup_chunk_size}m -d - '#{archive_name}.tar.bz2-'", false)
 end
 
 def transfer_to_s3!(key)
