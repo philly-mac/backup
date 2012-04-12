@@ -11,6 +11,9 @@
 @rsync_exec           = "/usr/bin/rsync"
 @tar_exec             = "/bin/tar"
 @rm_exec              = "/bin/rm"
+@pg_dumpall_exec      = "/bin/pg_dumpall"
+@mysqldump_exec       = "/usr/bin/mysqldump"
+@mongodump_exec       = "/usr/bin/mongodump"
 
 # File with password used to encrypt
 @ecrypt_password_file = "#{@base}/config/PASSPHRASE"
@@ -36,7 +39,7 @@
 
 # Should we dump and back up your mongo database
 @backup_mongodb_dump          = true
-@backup_mongodb_dump_user     = 'root'
+@backup_mongodb_dump_user     = nil
 @backup_mongodb_dump_password = nil
 
 # What to backup

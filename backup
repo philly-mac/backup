@@ -77,33 +77,30 @@ def passphrase_file_exists?
 end
 
 def dump_postgresql!(key)
-  # TODO: check postgres exists
   puts "Dumping Postgresql databases..."
   credentials = ''
   credentials = "-U #{@backup_postgresql_dump_user}"    if @backup_postgresql_dump_user
 
   cmd = ""
   cmd << "PGPASSWORD=#{@backup_mysql_dump_password}; " if @backup_postgresql_dump_password
-  cmd << "pg_dumpall #{credentials} -c -w > #{@destinations[key]}/postgresql-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql"
+  cmd << "#{@pg_dumpall_exec} #{credentials} -c -w > #{@destinations[key]}/postgresql-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql"
   run!(cmd, false)
 end
 
 def dump_mysql!(key)
-  # TODO: check mysql exists
   puts "Dumping Mysql databases..."
   credentials = ''
   credentials = "-u #{@backup_mysql_dump_user}"     if @backup_mysql_dump_user
   credentials = "-p #{@backup_mysql_dump_password}" if @backup_mysql_dump_password
-  run!("mysqldump #{credentials} --all-databases > #{@destinations[key]}/mysql-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql", false)
+  run!("#{@mysqldump_exec} #{credentials} --all-databases > #{@destinations[key]}/mysql-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql", false)
 end
 
 def dump_mongodb!(key)
-  # TODO: check mysql exists
   puts "Dumping Mongodb databases..."
   credentials = ''
-  # credentials = "-u #{@backup_mysql_dump_user}"     if @backup_mysql_dump_user
-  # credentials = "-p #{@backup_mysql_dump_password}" if @backup_mysql_dump_password
-  # run!("mysqldump #{credentials} -w > #{@destinations[key]}/mysql-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql", false)
+  credentials = "-u #{@backup_mongodb_dump_user}"     if @backup_mongodb_dump_user
+  credentials = "-p #{@backup_mongodb_dump_password}" if @backup_mongodb_dump_password
+  run!("#{@mongodump_exec} #{credentials} --out - > #{@destinations[key]}/mongodb-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql", false)
 end
 
 def dump_db!(key)
