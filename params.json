@@ -1,0 +1,1 @@
+{"name":"Backup","body":"Simple ruby script to do full/incremental encrypted offsite backups\r\n\r\nusing\r\n\r\nrsync to create full backups and incremental diffs\r\necryptfs to create encrypted partitions\r\ns3cmd to transfer to amazon s3","tagline":"Backup scripts","google":"","note":"Don't delete this file! It's used internally to help with page regeneration."}
