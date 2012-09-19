@@ -16,7 +16,7 @@ SimpleConfig.for :application do
   set :log_file_dir,  "#{base}/log"
 
   # Size in which to split the backup archives in megabytes
-  set :backup_chunk_size, 100
+
 
   group :destinations do
     set :encrypt,     "#{base}/backups",

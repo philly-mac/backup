@@ -28,12 +28,20 @@ module Backup
 
       Backup::Providers::Log.create
 
-      make_directory(path)
-      clear_directory(path)
-      dump_data
-      send(:"#{backup_type}_backup")
-      Backup::Providers::Archive.pack(path)
-      Backup::Providers::AmazonS3.transfer(path)
+      unless File.exist?(path)
+        Backup::Providers::Log.log("Creating directory #{path}")
+        FileUtils.mkdir_p(path)
+      end
+
+      if File.exist?(path)
+        Backup::Providers::Log.log("Removing directory #{path}")
+        FileUtils.rm_rf(path)
+      end
+
+      providers.each(&:dump)
+
+      Backup::Providers::Archive.pack
+      Backup::Providers::AmazonS3.transfer
     end
 
     def self.providers
@@ -44,24 +52,6 @@ module Backup
         Backup::Providers::Postgresql,
         Backup::Providers::Rdis,
       ]
-    end
-
-    def self.dump_data(key)
-      providers.each(&:dump!)
-    end
-
-    def self.make_directory(path)
-      unless File.exist?(path)
-        Backup::Providers::Log.log("Creating directory #{path}")
-        FileUtils.mkdir_p(path)
-      end
-    end
-
-    def self.clear_directory(path)
-      if File.exist?(path)
-        Backup::Providers::Log.log("Removing directory #{path}")
-        FileUtils.rm_rf(path)
-      end
     end
 
     def self.full?

@@ -8,7 +8,7 @@ module Backup
           "backup-incremental-#{AppConfig.year}-#{AppConfig.week_number}-#{AppConfig.day_number}"
       end
 
-      def self.pack(path)
+      def self.pack
         Backup::Providers::Log.log("Packing the archive..")
 
         FileUtils.mkdir_p(AppConfig.destinations.archives)

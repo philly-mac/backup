@@ -2,7 +2,7 @@ module Backup
   module Providers
     class MySQL
 
-      def self.dump(path)
+      def self.dump
         if AppConfig.mysql.dump
           Backup::Providers::Log.log "Dumping Mysql databases..."
           credentials = ''

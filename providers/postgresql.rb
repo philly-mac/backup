@@ -2,7 +2,7 @@ module Backup
   module Providers
     class Postgresql
 
-      def self.dump(path)
+      def self.dump
         if AppConfig.postgresql.dump
           Backup::Providers::Log.log "Dumping Postgresql databases..."
 

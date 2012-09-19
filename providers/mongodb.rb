@@ -2,7 +2,7 @@ module Backup
   module Providers
     class MongoDB
 
-      def self.dump(path)
+      def self.dump
         if AppConfig.mongodb.dump
           Backup::Providers::Log.log "Dumping Mongodb databases..."
           credentials = ''
