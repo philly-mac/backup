@@ -1,190 +1,90 @@
 #!/usr/bin/env ruby
 
+APP_ROOT = "#{File.dirname(File.expand_path(__FILE__))}/.."
+$: << APP_ROOT
+
+require 'config/simple_config'
+
+AppConfig = SimpleConfig.for(:application)
+
 require 'fileutils'
 
-# Requirements
-# openssl        -
-# Rsync          - http://rsync.samba.org/
-# s3cmd          - https://github.com/s3tools/s3cmd
-# tar            - http://www.gnu.org/software/tar/
-# rm             - http://pubs.opengroup.org/onlinepubs/9699919799/utilities/rm.html
-# split
-# Amazon s3      - http://aws.amazon.com/s3/
+require 'providers/files'
+require 'providers/mongodb'
+require 'providers/mysql'
+require 'providers/postgresql'
+require 'providers/redis'
+require 'providers/log'
+require 'providers/archive'
+require 'providers/time'
 
-# Optional
+module Backup
+  class Backup
 
-# Postgres       - http://www.postgresql.org/
+    def self.run(backup_type)
+      AppConfig.backup_type = backup_type
 
-# Follow the individual instructions for each of the tools on how to set them up properly
+      path = AppConfig.destinations.send(:backup_type)
 
-# You will probably want to back up daily, so these are 2 lines that you can put
-# into your crontab to do just that. Remove the comment hashes ofcourse ;)
+      Backup::Providers::Log.create
 
-# 0 1 * * 1           /opt/backup/backup full
-# 0 2 * * 2,3,4,5,6,7 /opt/backup/backup inc
+      make_directory(path)
+      clear_directory(path)
+      dump_data
+      send(:"#{backup_type}_backup")
+      Backup::Providers::Archive.pack(path)
+      Backup::Providers::AmazonS3.transfer(path)
+    end
 
-# TODO:
-# Remove backups older than ... configurable
-# Restore from method
-# Delete local caches
-# Rotate local logs
+    def self.providers
+      [
+        Backup::Providers::Files,
+        Backup::Providers::MongoDB,
+        Backup::Providers::MySQL,
+        Backup::Providers::Postgresql,
+        Backup::Providers::Rdis,
+      ]
+    end
 
-##################################
-# Config
+    def self.dump_data(key)
+      providers.each(&:dump!)
+    end
 
-# Store config separate so that they don't get overwritten
-require "#{File.expand_path(File.dirname(__FILE__))}/config/setup"
+    def self.make_directory(path)
+      unless File.exist?(path)
+        Backup::Providers::Log.log("Creating directory #{path}")
+        FileUtils.mkdir_p(path)
+      end
+    end
 
-@destinations         ||= {
-  :encrypt  => "#{@base}/backups",
-  :archives => "#{@base}/archives"
-}
+    def self.clear_directory(path)
+      if File.exist?(path)
+        Backup::Providers::Log.log("Removing directory #{path}")
+        FileUtils.rm_rf(path)
+      end
+    end
 
-@destinations.merge!({
-  :full        => "#{@destinations[:encrypt]}/full",
-  :incremental => "#{@destinations[:encrypt]}/incremental"
-})
+    def self.full?
+      AppConfig.destinations.send(:backup_type) == 'full'
+    end
 
-@excludes = [
-  @destinations[:encrypt],
-  @destinations[:archives]
-]
+    def self.incremental?
+      AppConfig.destinations.send(:backup_type) == 'incremental'
+    end
 
-@excludes = @excludes + @custom_excludes
-
-# End config
-##################################
-
-def log_file
-  key = full? ? :full : :incremental
-  @log_name ||= "#{@log_file_dir}#{archive_name}.log"
-end
-
-def create_log_file!
-  make_directory!(@log_file_dir)
-  run!("touch #{log_file}")
-  run!("> #{log_file}")
-end
-
-def run!(cmd, log = true, exit_check = false)
-  cmd << " >> #{log_file}" if log
-  puts "Running #{cmd}..."
-  exit_check ? system(cmd) : `#{cmd}`
-end
-
-def passphrase_file_exists?
-  File.exist?(@ecrypt_password_file)
-end
-
-def dump_postgresql!(key)
-  puts "Dumping Postgresql databases..."
-  credentials = ''
-  credentials = "-U #{@backup_postgresql_dump_user}"    if @backup_postgresql_dump_user
-
-  cmd = ""
-  cmd << "PGPASSWORD=#{@backup_mysql_dump_password}; " if @backup_postgresql_dump_password
-  cmd << "#{@pg_dumpall_exec} #{credentials} -c -w > #{@destinations[key]}/postgresql-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql"
-  run!(cmd, false)
-end
-
-def dump_mysql!(key)
-  puts "Dumping Mysql databases..."
-  credentials = ''
-  credentials = "-u #{@backup_mysql_dump_user}"     if @backup_mysql_dump_user
-  credentials = "-p #{@backup_mysql_dump_password}" if @backup_mysql_dump_password
-  run!("#{@mysqldump_exec} #{credentials} --all-databases > #{@destinations[key]}/mysql-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql", false)
-end
-
-def dump_mongodb!(key)
-  puts "Dumping Mongodb databases..."
-  credentials = ''
-  credentials = "-u #{@backup_mongodb_dump_user}"     if @backup_mongodb_dump_user
-  credentials = "-p #{@backup_mongodb_dump_password}" if @backup_mongodb_dump_password
-  run!("#{@mongodump_exec} #{credentials} --out - > #{@destinations[key]}/mongodb-database-#{Time.now.strftime('%Y%m%d%H%M%S')}.sql", false)
-end
-
-def dump_db!(key)
-  dump_postgresql!(key) if @backup_postgresql_dump
-  dump_mysql!(key)      if @backup_mysql_dump
-  dump_mongodb!(key)    if @backup_mongodb_dump
-end
-
-def full?
-  @full ||= ARGV.first == 'full'
-end
-
-def inc?
-  @inc ||= ARGV.first == 'inc'
-end
-
-def year
-  @year ||= Time.now.strftime('%Y')
-end
-
-def week_number
-  @week_number ||= Time.now.strftime('%V')
-end
-
-def day_number
-  @day_number ||= Time.now.strftime('%w')
-end
-
-def archive_name
-  full? ? "/backup-full-#{year}-#{week_number}" : "/backup-inc-#{year}-#{week_number}-#{day_number}"
-end
-
-def make_directory!(key)
-  path = key.is_a?(String) ? key : "#{@destinations[key]}"
-  unless File.exist?(path)
-    puts "Creating #{path}"
-    FileUtils.mkdir_p(path)
   end
 end
 
-def clear_directory!(key)
-  path = "#{@destinations[key]}/*"
-  puts "Clearing #{path}.."
-  run!("#{@rm_exec} -rf #{path}")
+backup_type = ARGV.first
+
+if !backup_type
+  puts "No Backup type specified"
+  exit 1
 end
 
-def archive!(key)
-  puts "Packing the archive.."
-  make_directory!(:archives)
-  run!("#{@tar_exec} -cj #{@destinations[key]} | openssl des3 -salt -k `cat #{@ecrypt_password_file}` | split -b #{@backup_chunk_size}m -d - '#{@destinations[:archives]}/#{archive_name}.tar.bz2-'", false)
+if !%w{full incremental}.include?(backup_type)
+  puts "Unknow backup type specified: #{backup_type}"
+  exit 1
 end
 
-def transfer_to_s3!(key)
-  puts "Transfering to s3..."
-  run!("#{@s3cmd_exec} put #{@destinations[:archives]}/#{archive_name}.tar.bz2* #{@bucket}")
-  run!("#{@s3cmd_exec} ls #{@bucket}")
-end
-
-# Backup
-if full?
-  puts "Full backup.."
-  create_log_file!
-  make_directory!(:full)
-  clear_directory!(:full)
-  run!("#{@rsync_exec} -Rav #{@excludes.map{|e| "--exclude=#{e}"}.join(' ')} #{@sources.join(' ')} #{@destinations[:full]}/")
-  dump_db!(:full)
-  archive!(:full)
-  transfer_to_s3!(:full)
-elsif inc?
-  puts "Incremental backup.."
-  create_log_file!
-  make_directory!(:incremental)
-  clear_directory!(:incremental)
-
-  @sources.each do |source|
-    make_directory!("#{@destinations[:incremental]}#{source}")
-    run!("#{@rsync_exec} -Rav #{@excludes.map{|e| "--exclude=#{e}"}.join(' ')} --compare-dest=#{@destinations[:full]}/ #{source}/ #{@destinations[:incremental]}/")
-  end
-
-  dump_db!(:incremental)
-  archive!(:incremental)
-  transfer_to_s3!(:incremental)
-end
-
-puts "Year #{year}"
-puts "Week Number #{week_number}"
-puts "Day Number #{day_number}"
+Backup::Backup.run(backup_type)
